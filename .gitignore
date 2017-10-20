@@ -1,0 +1,11 @@
+Debug/
+Release/
+DirectX9_Base.sdf
+
+# User-specific files
+*.suo
+*.user
+*.sln.docstates
+
+*.VC.db
+*.opendb
