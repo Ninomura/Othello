@@ -33,8 +33,6 @@ enum Game_WB_MODE
 	Mode_black
 };
 
-extern Game_WB_MODE WB;
-
 //”Õ–Ê‚Ìó‘Ô
 enum PieceState
 {
@@ -43,5 +41,3 @@ enum PieceState
 	Chooseable,  //‘I‘ğ‰Â”\
 	null         //–³
 };
-
-extern PieceState PS[MapSize*MapSize];

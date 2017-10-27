@@ -158,8 +158,8 @@ HRESULT MakeWindow
 	HWND &refHWnd,	//ウィンドウの識別子
 					//正しくウィンドウの作成ができたら
 					//この変数に識別子を代入する
-	int width = 800,	//クライアント領域の幅
-	int height = 600)	//クライアント領域の高さ
+	int width = 675,	//クライアント領域の幅
+	int height = 375)	//クライアント領域の高さ
 						//クライアント領域はウィンドウ全体から
 						//外枠やメニューの部分を除いた物と今は思っておけばOK
 {
@@ -185,7 +185,7 @@ HRESULT MakeWindow
 	(0,						//ウィンドウ拡張スタイル
 		WC_BASIC,				//作りたいウィンドウクラス
 								//あらかじめ登録されたもの
-		_T("タイトル"),			//ウィンドウのタイトル
+		_T("REVERSE"),			//ウィンドウのタイトル
 		WS_OVERLAPPEDWINDOW,	//ウィンドウのスタイル
 		CW_USEDEFAULT,			//位置x座標 デフォルトの値
 		CW_USEDEFAULT,			//位置y座標 デフォルトの値
@@ -284,18 +284,22 @@ int _stdcall WinMain
 	pDi->Init(hWnd);
 
 	int Xcount, Ycount;
-	bool Mouseflag = false, Reverseflag = false;
-	bool Reverseflag8[8];
-
-	for (int count = 0; count < 8; count++)
-	{
-		Reverseflag8[count] = false;
-	}
+	bool Mouseflag, Reverseflag;
+	bool ReverseCount;
 
 	//マウス座標
-	int MousePosX, MousePosY;
+	int MousePosX, MousePosY,
 
+	//駒の数
+		blackCount, whiteCount, ChooseableCount;
+
+
+	//盤面の状態
 	PieceState PS[MapSize][MapSize];
+
+	PieceState
+	InversionVariable, //反転変数
+	DecisionVariable;  //判断変数
 
 	//駒を表す画像サイズ
 	int PieceImageSize = BoardImageSize / MapSize;
@@ -336,7 +340,7 @@ int _stdcall WinMain
 
 			//選択可能領域の画像
 			sprite_img_Chooseable[countY][countX].SetAlpha(1);
-			sprite_img_Chooseable[countY][countX].SetSize(PieceImageSize, PieceImageSize);
+			sprite_img_Chooseable[countY][countX].SetSize(PieceImageSize+14, PieceImageSize+14);
 			sprite_img_Chooseable[countY][countX].SetAngle(0);
 
 			img_Chooseable[countY][countX].Load(_T("Texture/Chooseable.png"));
@@ -345,11 +349,100 @@ int _stdcall WinMain
 		}
 	}
 
+	//カーソルの画像を設定
+	Sprite sprite_img_cursor;
+	Texture img_cursor;
+	sprite_img_cursor.SetAlpha(1);
+	sprite_img_cursor.SetSize(50.0, 50.0);
+	sprite_img_cursor.SetAngle(0);
+
+	img_cursor.Load(_T("Texture/Cursor.png"));
+	img_cursor.SetDivide(0, 0);
+	img_cursor.SetNum(0, 0);
+
+	//スコアボードの画像を設定
+	Sprite sprite_img_ScoreBoard;
+	Texture img_ScoreBoard;
+	sprite_img_ScoreBoard.SetAlpha(1);
+	sprite_img_ScoreBoard.SetSize(250.0, 375.0);
+	sprite_img_ScoreBoard.SetAngle(0);
+	sprite_img_ScoreBoard.SetPos(550.0, 190.0);
+
+	img_ScoreBoard.Load(_T("Texture/ScoreBoard.png"));
+	img_ScoreBoard.SetDivide(0, 0);
+	img_ScoreBoard.SetNum(0, 0);
+
+	//スコアの画像を設定
+	//白
+	Sprite sprite_img_PieceScoreW;
+	Texture img_PieceScoreW;
+	sprite_img_PieceScoreW.SetAlpha(1);
+	sprite_img_PieceScoreW.SetSize(PieceImageSize, PieceImageSize);
+	sprite_img_PieceScoreW.SetAngle(0);
+	sprite_img_PieceScoreW.SetPos(510.0, 200.0 + (float)PieceImageSize / 2.0 + 2.0);
+
+	img_PieceScoreW.Load(_T("Texture/Piece.png"));
+	img_PieceScoreW.SetDivide(8, 0);
+	img_PieceScoreW.SetNum(0, 0);
+
+	//黒
+	Sprite sprite_img_PieceScoreB;
+	Texture img_PieceScoreB;
+	sprite_img_PieceScoreB.SetAlpha(1);
+	sprite_img_PieceScoreB.SetSize(PieceImageSize, PieceImageSize);
+	sprite_img_PieceScoreB.SetAngle(0);
+	sprite_img_PieceScoreB.SetPos(510.0, 100.0 + (float)PieceImageSize / 2.0 + 2.0);
+
+	img_PieceScoreB.Load(_T("Texture/Piece.png"));
+	img_PieceScoreB.SetDivide(8, 0);
+	img_PieceScoreB.SetNum(7, 0);
+
+	//勝ち、負け、引き分けの画像設定
+	Sprite sprite_img_WLD[2];
+	Texture img_WLD[2];
+	for (int count = 0; count < 2; count++)
+	{
+		sprite_img_WLD[count].SetAlpha(1);
+		sprite_img_WLD[count].SetSize(90.0, 30.0);
+		sprite_img_WLD[count].SetAngle(0);
+		sprite_img_WLD[count].SetPos(490.0, count*100.0 + (float)PieceImageSize / 2.0 + 67.0);
+
+		img_WLD[count].Load(_T("Texture/WLD.png"));
+		img_WLD[count].SetDivide(3, 0);
+	}
+	
+	//駒の数の画像設定
+	//白
+	Sprite sprite_img_NumberW[2];
+	Texture img_NumberW[2];
+	for (int count = 0; count < 2; count++)
+	{
+		sprite_img_NumberW[count].SetAlpha(1);
+		sprite_img_NumberW[count].SetSize(30.0, 30.0);
+		sprite_img_NumberW[count].SetAngle(0);
+		sprite_img_NumberW[count].SetPos(count*20.0 + 560.0, 200.0 + (float)PieceImageSize / 2.0 + 2.0);
+
+		img_NumberW[count].Load(_T("Texture/Number.png"));
+		img_NumberW[count].SetDivide(10, 0);
+	}
+
+	Sprite sprite_img_NumberB[2];
+	Texture img_NumberB[2];
+	for (int count = 0; count < 2; count++)
+	{
+		sprite_img_NumberB[count].SetAlpha(1);
+		sprite_img_NumberB[count].SetSize(30.0, 30.0);
+		sprite_img_NumberB[count].SetAngle(0);
+		sprite_img_NumberB[count].SetPos(count*20.0 + 560.0, 100.0 + (float)PieceImageSize / 2.0 + 2.0);
+
+		img_NumberB[count].Load(_T("Texture/Number.png"));
+		img_NumberB[count].SetDivide(10, 0);
+	}
+
 	Game_MODE Mode;
 	Mode = GameStartProcessing; //初期モードを演算処理モードに設定
 
 	Game_WB_MODE WB;
-	WB = Mode_black;
 
 	MSG msg = {};
 
@@ -372,27 +465,35 @@ int _stdcall WinMain
 		}
 		else
 		{
-
 			pDi->Update();//キー状態の更新
-
-			if (pDi->KeyJustPressed(DIK_A))
-			{
-				MessageBox(NULL,
-					TEXT("キー入力確認"),
-					TEXT("テスト-タイトル"),
-					MB_OK);
-			}
 
 			switch (Mode)
 			{
 
-				//スタート画面
+			//スタート画面
 			case Game_MODE::StartScreenProcessing:
 
 				break;
 
-				//初期処理
+			//初期処理
 			case Game_MODE::GameStartProcessing:
+
+				//黒の順番に指定
+				WB = Mode_black;
+
+				//反転変数を白に
+				InversionVariable = white;
+
+				//判断変数を黒に
+				DecisionVariable = black;
+
+				blackCount = 0;
+				whiteCount = 0;
+				ChooseableCount = 0;
+				ReverseCount = false;
+
+				Mouseflag = false;
+				Reverseflag = false;
 
 				//盤面のリセット
 				for (int countY = 0; countY < MapSize; countY++)
@@ -404,14 +505,13 @@ int _stdcall WinMain
 				}
 
 				//初期の盤面
-				PS[3][3] = white, PS[4][4] = white;
-				PS[3][4] = black, PS[4][3] = black;
+				PS[3][3] = white; PS[4][4] = white;
+				PS[3][4] = black; PS[4][3] = black;
 
 				//選択可能処理モードに移動
 				Mode = SelectableProcessing;
 
 				break;
-
 
 				//選択可能処理モード
 			case Game_MODE::SelectableProcessing:
@@ -428,19 +528,13 @@ int _stdcall WinMain
 					}
 				}
 
-				//反転処理用（8方向）フラグのリセット
-				for (int count = 0; count < 8; count++)
-				{
-					Reverseflag8[count] = false;
-				}
-
 				//選択可能処理
 				for (int countY = 0; countY < MapSize; countY++)
 				{
 					for (int countX = 0; countX < MapSize; countX++)
 					{
 						//駒が白である場合。（順番が黒の場合）
-						if (WB == Mode_black && PS[countY][countX] == white)
+						if (PS[countY][countX] == InversionVariable)
 						{
 							//→方向
 							if (countX != 0 && countX + 1 < MapSize)
@@ -448,16 +542,15 @@ int _stdcall WinMain
 								for (Xcount = countX + 1; Xcount < MapSize; Xcount++)
 								{
 									//黒だった場合
-									if (PS[countY][Xcount] == black)
+									if (PS[countY][Xcount] == DecisionVariable)
 									{
-										if (PS[countY][countX - 1] == null)
+										if (PS[countY][countX - 1] != InversionVariable && PS[countY][countX - 1] != DecisionVariable)
 										{
 											PS[countY][countX - 1] = Chooseable;
-											Reverseflag8[0] = true;
 											break;
 										}
 									}
-									else if (PS[countY][Xcount] == null|| PS[countY][Xcount] == Chooseable)
+									else if (PS[countY][Xcount] == null || PS[countY][Xcount] == Chooseable)
 									{
 										break;
 									}
@@ -467,12 +560,11 @@ int _stdcall WinMain
 								for (Xcount = countX - 1; Xcount >= 0; Xcount--)
 								{
 									//黒だった場合
-									if (PS[countY][Xcount] == black)
+									if (PS[countY][Xcount] == DecisionVariable)
 									{
-										if (PS[countY][countX + 1] != white && PS[countY][countX + 1] != black)
+										if (PS[countY][countX + 1] != InversionVariable && PS[countY][countX + 1] != DecisionVariable)
 										{
 											PS[countY][countX + 1] = Chooseable;
-											Reverseflag8[1] = true;
 											break;
 										}
 									}
@@ -488,16 +580,15 @@ int _stdcall WinMain
 								for (Ycount = countY + 1; Ycount < MapSize; Ycount++)
 								{
 									//黒だった場合
-									if (PS[Ycount][countX] == black)
+									if (PS[Ycount][countX] == DecisionVariable)
 									{
-										if (PS[countY - 1][countX] != white && PS[countY - 1][countX] != black)
+										if (PS[countY - 1][countX] != InversionVariable && PS[countY - 1][countX] != DecisionVariable)
 										{
 											PS[countY - 1][countX] = Chooseable;
-											Reverseflag8[2] = true;
 											break;
 										}
 									}
-									else if (PS[Ycount][countX] == null)
+									else if (PS[Ycount][countX] == null || PS[Ycount][countX] == Chooseable)
 									{
 										break;
 									}
@@ -506,12 +597,11 @@ int _stdcall WinMain
 								for (Ycount = countY - 1; Ycount >= 0; Ycount--)
 								{
 									//黒だった場合
-									if (PS[Ycount][countX] == black)
+									if (PS[Ycount][countX] == DecisionVariable)
 									{
-										if (PS[countY + 1][countX] != white && PS[countY + 1][countX] != black)
+										if (PS[countY + 1][countX] != InversionVariable && PS[countY + 1][countX] != DecisionVariable)
 										{
 											PS[countY + 1][countX] = Chooseable;
-											Reverseflag8[3] = true;
 											break;
 
 										}
@@ -523,7 +613,7 @@ int _stdcall WinMain
 								}
 							}
 
-							if (countX != 0 && countX + 1 < MapSize || countY != 0 && countY + 1 < MapSize)
+							if (countX != 0 && countX + 1 < MapSize && countY != 0 && countY + 1 < MapSize)
 							{
 								//右上
 								Ycount = countY - 1;
@@ -536,22 +626,22 @@ int _stdcall WinMain
 									}
 
 									//黒だった場合
-									if (PS[Ycount][Xcount] == black)
+									if (PS[Ycount][Xcount] == DecisionVariable)
 									{
-										if (PS[countY + 1][countX - 1] != white && PS[countY + 1][countX - 1] != black)
+										if (PS[countY + 1][countX - 1] != InversionVariable && PS[countY + 1][countX - 1] != DecisionVariable)
 										{
 											PS[countY + 1][countX - 1] = Chooseable;
-											Reverseflag8[4] = true;
 											break;
 										}
 									}
-									else if (PS[Ycount][Xcount] == null || PS[Ycount][countX] == Chooseable)
+									else if (PS[Ycount][Xcount] == null || PS[Ycount][Xcount] == Chooseable)
 									{
 										break;
 									}
 
 									Ycount--;
 								}
+
 								//右下
 								Ycount = countY + 1;
 
@@ -563,12 +653,11 @@ int _stdcall WinMain
 									}
 
 									//黒だった場合
-									if (PS[Ycount][Xcount] == black)
+									if (PS[Ycount][Xcount] == DecisionVariable)
 									{
-										if (PS[countY - 1][countX - 1] != white && PS[countY - 1][countX - 1] != black)
+										if (PS[countY - 1][countX - 1] != InversionVariable && PS[countY - 1][countX - 1] != DecisionVariable)
 										{
 											PS[countY - 1][countX - 1] = Chooseable;
-											Reverseflag8[5] = true;
 											break;
 										}
 									}
@@ -579,8 +668,8 @@ int _stdcall WinMain
 
 									Ycount++;
 								}
-								//左上
 
+								//左上
 								Ycount = countY - 1;
 
 								for (Xcount = countX - 1; Xcount >= 0; Xcount--)
@@ -591,12 +680,11 @@ int _stdcall WinMain
 									}
 
 									//黒だった場合
-									if (PS[Ycount][Xcount] == black)
+									if (PS[Ycount][Xcount] == DecisionVariable)
 									{
-										if (PS[countY + 1][countX + 1] != white && PS[countY + 1][countX + 1] != black)
+										if (PS[countY + 1][countX + 1] != InversionVariable && PS[countY + 1][countX + 1] != DecisionVariable)
 										{
 											PS[countY + 1][countX + 1] = Chooseable;
-											Reverseflag8[6] = true;
 											break;
 										}
 									}
@@ -619,248 +707,11 @@ int _stdcall WinMain
 									}
 
 									//黒だった場合
-									if (PS[Ycount][Xcount] == black)
+									if (PS[Ycount][Xcount] == DecisionVariable)
 									{
-										if (PS[countY - 1][countX + 1] != white && PS[countY - 1][countX + 1] != black)
+										if (PS[countY - 1][countX + 1] != InversionVariable && PS[countY - 1][countX + 1] != DecisionVariable)
 										{
 											PS[countY - 1][countX + 1] = Chooseable;
-											Reverseflag8[7] = true;
-											break;
-										}
-									}
-									else if (PS[Ycount][Xcount] == null || PS[Ycount][Xcount] == Chooseable)
-									{
-										break;
-									}
-
-									Ycount++;
-								}
-							}
-
-						}
-						//駒が黒であって、外側でない場合。（順番が白の場合）
-						else if (WB == Mode_white&&PS[countY][countX] == black)
-						{
-
-							if (countX != 0 && countX + 1 < MapSize)
-							{
-								//→方向
-								for (Xcount = countX + 1; Xcount < MapSize; Xcount++)
-								{
-									//白だった場合
-									if (PS[countY][Xcount] == white)
-									{
-										if (PS[countY][countX - 1] != white && PS[countY][countX - 1] != black)
-										{
-											PS[countY][countX - 1] = Chooseable;
-											Reverseflag8[0] = true;
-											break;
-										}
-										else
-										{
-											break;
-										}
-									}
-									else if (PS[countY][Xcount] == null || PS[countY][Xcount] == Chooseable)
-									{
-										break;
-									}
-								}
-								//←方向
-								for (Xcount = countX - 1; Xcount >= 0; Xcount--)
-								{
-									//白だった場合
-									if (PS[countY][Xcount] == white)
-									{
-										if (PS[countY][countX + 1] != white && PS[countY][countX + 1] != black)
-										{
-											PS[countY][countX + 1] = Chooseable;
-											Reverseflag8[1] = true;
-											break;
-										}
-										else
-										{
-											break;
-										}
-									}
-									else if (PS[countY][Xcount] == null || PS[countY][Xcount] == Chooseable)
-									{
-										break;
-									}
-								}
-							}
-
-							if (countY != 0 && countY + 1 < MapSize)
-							{
-								//↓方向
-								for (Ycount = countY + 1; Ycount < MapSize; Ycount++)
-								{
-									//白だった場合
-									if (PS[Ycount][countX] == white)
-									{
-										if (PS[countY - 1][countX] != white && PS[countY - 1][countX] != black)
-										{
-											PS[countY - 1][countX] = Chooseable;
-											Reverseflag8[2] = true;
-											break;
-										}
-										else
-										{
-											break;
-										}
-									}
-									else if (PS[Ycount][countX] == null || PS[Ycount][countX] == Chooseable)
-									{
-										break;
-									}
-								}
-								//↑方向
-								for (Ycount = countY - 1; Ycount >= 0; Ycount--)
-								{
-									//白だった場合
-									if (PS[Ycount][countX] == white)
-									{
-										if (PS[countY + 1][countX] != white && PS[countY + 1][countX] != black)
-										{
-											PS[countY + 1][countX] = Chooseable;
-											Reverseflag8[3] = true;
-											break;
-										}
-										else
-										{
-											break;
-										}
-									}
-									else if (PS[Ycount][countX] == null || PS[Ycount][countX] == Chooseable)
-									{
-										break;
-									}
-								}
-							}
-
-
-							if (countX != 0 && countX + 1 < MapSize || countY != 0 && countY + 1 < MapSize)
-							{
-								//右上
-								Ycount = countY - 1;
-
-								for (Xcount = countX + 1; Xcount < MapSize; Xcount++)
-								{
-									if (Ycount <= 0)
-									{
-										break;
-									}
-
-									//白だった場合
-									if (PS[Ycount][Xcount] == white)
-									{
-										if (PS[countY + 1][countX - 1] != white && PS[countY + 1][countX - 1] != black)
-										{
-											PS[countY + 1][countX - 1] = Chooseable;
-											Reverseflag8[4] = true;
-											break;
-										}
-										else
-										{
-											break;
-										}
-									}
-									else if (PS[Ycount][Xcount] == null || PS[Ycount][Xcount] == Chooseable)
-									{
-										break;
-									}
-
-									Ycount--;
-								}
-
-								//右下
-								Ycount = countY + 1;
-
-								for (Xcount = countX + 1; Xcount < MapSize; Xcount++)
-								{
-									if (Ycount >= MapSize)
-									{
-										break;
-									}
-
-									//白だった場合
-									if (PS[Ycount][Xcount] == white)
-									{
-										if (PS[countY - 1][countX - 1] != white && PS[countY - 1][countX - 1] != black)
-										{
-											PS[countY - 1][countX - 1] = Chooseable;
-											Reverseflag8[5] = true;
-											break;
-										}
-										else
-										{
-											break;
-										}
-									}
-									else if (PS[Ycount][Xcount] == null || PS[Ycount][Xcount] == Chooseable)
-									{
-										break;
-									}
-
-									Ycount++;
-								}
-
-								//左上
-
-								Ycount = countY - 1;
-
-								for (Xcount = countX - 1; Xcount >= 0; Xcount--)
-								{
-									if (Ycount <= 0)
-									{
-										break;
-									}
-
-
-									//白だった場合
-									if (PS[Ycount][Xcount] == white)
-									{
-										if (PS[countY + 1][countX + 1] != white && PS[countY + 1][countX + 1] != black)
-										{
-											PS[countY + 1][countX + 1] = Chooseable;
-											Reverseflag8[6] = true;
-											break;
-										}
-										else
-										{
-											break;
-										}
-									}
-									else if (PS[Ycount][Xcount] == null || PS[Ycount][Xcount] == Chooseable)
-									{
-										break;
-									}
-
-									Ycount--;
-
-								}
-
-								//左下
-								Ycount = countY + 1;
-
-								for (Xcount = countX - 1; Xcount >= 0; Xcount--)
-								{
-									if (Ycount >= MapSize)
-									{
-										break;
-									}
-
-									//白だった場合
-									if (PS[Ycount][Xcount] == white)
-									{
-										if (PS[countY - 1][countX + 1] != white && PS[countY - 1][countX + 1] != black)
-										{
-											PS[countY - 1][countX + 1] = Chooseable;
-											Reverseflag8[7] = true;
-											break;
-										}
-										else
-										{
 											break;
 										}
 									}
@@ -876,15 +727,86 @@ int _stdcall WinMain
 					}
 				}
 
-				//プレイヤー操作モードに移動
-				Mode = PlayerProcessing;
+				//置ける場所がない時はパス
+				//黒、白の駒がいくつあるか
+
+				ChooseableCount = 0;
+				blackCount = 0;
+				whiteCount = 0;
+
+				for (int countY = 0; countY < MapSize; countY++)
+				{
+					for (int countX = 0; countX < MapSize; countX++)
+					{
+						if (PS[countY][countX] == Chooseable)
+						{
+							ChooseableCount++;
+						}
+						else if (PS[countY][countX] == black)
+						{
+							blackCount++;
+						}
+						else if (PS[countY][countX] == white)
+						{
+							whiteCount++;
+						}
+					}
+				}
+
+				if (ChooseableCount == 0)
+				{
+					if (ReverseCount == true)
+					{
+						Mode = GameEndProcessing;
+						break;
+					}
+					else
+					{
+						switch (WB)
+						{
+							//白の手の場合
+						case Mode_white:
+
+							//黒の順番に変更
+							WB = Mode_black;
+
+							//反転変数を白に
+							InversionVariable = white;
+
+							//判断変数を黒に
+							DecisionVariable = black;
+							break;
+
+							//黒の手の場合
+						case Mode_black:
+
+							//白の順番に変更
+							WB = Mode_white;
+
+							//反転変数を黒に
+							InversionVariable = black;
+
+							//判断変数を白に
+							DecisionVariable = white;
+							break;
+						}
+
+						ReverseCount = true;
+					}
+				}
+				else
+				{
+					ReverseCount = false;
+					//プレイヤー操作モードに移動
+					Mode = PlayerProcessing;
+				}
 
 				break;
 
-				//プレイヤー操作モード
+			//プレイヤー操作モード
 			case Game_MODE::PlayerProcessing:
 
-				if (Mouseflag == false&&pDi->MouseButton(0))
+				if (Mouseflag == false && pDi->MouseButton(0))
 				{
 					Mouseflag = true;
 
@@ -893,24 +815,21 @@ int _stdcall WinMain
 					MousePosX = mousePos.X() / PieceImageSize;
 					MousePosY = mousePos.Y() / PieceImageSize;
 
-					for (int countY = 0; countY < MapSize; countY++)
+					if (MousePosX < MapSize&&MousePosX < MapSize)
 					{
-						for (int countX = 0; countX < MapSize; countX++)
+						if (PS[MousePosY][MousePosX] == Chooseable)
 						{
-							if (MousePosX == countX && MousePosY == countY&&PS[countY][countX] == Chooseable)
+							switch (WB)
 							{
-								switch (WB)
-								{
-								case Mode_white:
-									PS[countY][countX] = white;
-									Reverseflag = true;
-									break;
-								case Mode_black:
-									PS[countY][countX] = black;
-									Reverseflag = true;
-									break;
+							case Mode_white:
+								PS[MousePosY][MousePosX] = white;
+								Reverseflag = true;
+								break;
+							case Mode_black:
+								PS[MousePosY][MousePosX] = black;
+								Reverseflag = true;
+								break;
 
-								}
 							}
 						}
 					}
@@ -931,377 +850,392 @@ int _stdcall WinMain
 
 				//反転処理モード
 			case Game_MODE::InversionProcessing:
-
+			
 				switch (WB)
 				{
+				//白の手の場合
 				case Mode_white:
-
-					//→方向
-					if (Reverseflag8[0] == true)
-					{
-						for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
-						{
-							//黒だった場合
-							if (PS[MousePosY][Xcount] == black)
-							{
-								PS[MousePosY][Xcount] = white;
-							}
-							else
-							{
-								break;
-							}
-						}
-					}
-
-					//←方向
-					if (Reverseflag8[1] == true)
-					{
-						for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
-						{
-							//黒だった場合
-							if (PS[MousePosY][Xcount] == black)
-							{
-								PS[MousePosY][Xcount] = white;
-							}
-							else
-							{
-								break;
-							}
-						}
-					}
-
-					//↓方向
-					if (Reverseflag8[2] == true)
-					{
-						for (Ycount = MousePosY + 1; Ycount < MapSize; Ycount++)
-						{
-							//黒だった場合
-
-							if (PS[Ycount][MousePosX] == black)
-							{
-								PS[Ycount][MousePosX] = white;
-							}
-							else
-							{
-								break;
-							}
-						}
-					}
-
-					//↑方向
-					if (Reverseflag8[3] == true)
-					{
-						for (Ycount = MousePosY - 1; Ycount >= 0; Ycount--)
-						{
-							//黒だった場合
-							if (PS[Ycount][MousePosX] == black)
-							{
-								PS[Ycount][MousePosX] = white;
-							}
-							else
-							{
-								break;
-							}
-						}
-					}
-
-					//右上
-					if (Reverseflag8[4] == true)
-					{
-						Ycount = MousePosY - 1;
-
-						for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
-						{
-							if (Ycount <= 0)
-							{
-								break;
-							}
-
-							//黒だった場合
-							if (PS[Ycount][Xcount] == black)
-							{
-								PS[Ycount][Xcount] = white;
-							}
-							else
-							{
-								break;
-							}
-
-							Ycount--;
-						}
-					}
-
-					//右下
-					if (Reverseflag8[5] == true)
-					{
-						Ycount = MousePosY + 1;
-
-						for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
-						{
-							if (Ycount >= MapSize)
-							{
-								break;
-							}
-
-							//黒だった場合
-							if (PS[Ycount][Xcount] == black)
-							{
-								PS[Ycount][Xcount] = white;
-							}
-							else
-							{
-								break;
-							}
-
-							Ycount++;
-						}
-					}
-
-					//左上
-					if (Reverseflag8[6] == true)
-					{
-						Ycount = MousePosY - 1;
-
-						for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
-						{
-							if (Ycount <= 0)
-							{
-								break;
-							}
-
-							//黒だった場合
-							if (PS[Ycount][Xcount] == black)
-							{
-								PS[Ycount][Xcount] = white;
-							}
-							else
-							{
-								break;
-							}
-
-							Ycount--;
-
-						}
-					}
-
-					//左下
-					if (Reverseflag8[7] == true)
-					{
-						Ycount = MousePosY + 1;
-
-						for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
-						{
-							if (Ycount >= MapSize)
-							{
-								break;
-							}
-
-							//黒だった場合
-							if (PS[Ycount][Xcount] == black)
-							{
-								PS[Ycount][Xcount] = white;
-							}
-							else
-							{
-								break;
-							}
-
-							Ycount++;
-						}
-					}
 
 					//黒の順番に変更
 					WB = Mode_black;
-					//選択可能処理モードに移動
-					Mode = SelectableProcessing;
+
+					//反転変数を白に
+					InversionVariable = white;
+
+					//判断変数を黒に
+					DecisionVariable = black;
 					break;
+
+				//黒の手の場合
 				case Mode_black:
-
-					//→方向
-					if (Reverseflag8[0] == true)
-					{
-						for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
-						{
-							//白だった場合
-							if (PS[MousePosY][Xcount] == white)
-							{
-								PS[MousePosY][Xcount] = black;
-							}
-							else
-							{
-								break;
-							}
-						}
-					}
-
-					//←方向
-					if (Reverseflag8[1] == true)
-					{
-						for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
-						{
-							//白だった場合
-							if (PS[MousePosY][Xcount] == white)
-							{
-								PS[MousePosY][Xcount] = black;
-							}
-							else
-							{
-								break;
-							}
-						}
-					}
-
-					//↓方向
-					if (Reverseflag8[2] == true)
-					{
-						for (Ycount = MousePosY + 1; Ycount < MapSize; Ycount++)
-						{
-							//白だった場合
-
-							if (PS[Ycount][MousePosX] == white)
-							{
-								PS[Ycount][MousePosX] = black;
-							}
-							else
-							{
-								break;
-							}
-						}
-					}
-
-					//↑方向
-					if (Reverseflag8[3] == true)
-					{
-						for (Ycount = MousePosY - 1; Ycount >= 0; Ycount--)
-						{
-							//白だった場合
-							if (PS[Ycount][MousePosX] == white)
-							{
-								PS[Ycount][MousePosX] = black;
-							}
-							else
-							{
-								break;
-							}
-						}
-					}
-
-					//右上
-					if (Reverseflag8[4] == true)
-					{
-						Ycount = MousePosY - 1;
-
-						for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
-						{
-							if (Ycount <= 0)
-							{
-								break;
-							}
-
-							//白だった場合
-							if (PS[Ycount][Xcount] == white)
-							{
-								PS[Ycount][Xcount] = black;
-							}
-							else
-							{
-								break;
-							}
-
-							Ycount--;
-						}
-					}
-
-					//右下
-					if (Reverseflag8[5] == true)
-					{
-						Ycount = MousePosY + 1;
-
-						for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
-						{
-							if (Ycount >= MapSize)
-							{
-								break;
-							}
-
-							//白だった場合
-							if (PS[Ycount][Xcount] == white)
-							{
-								PS[Ycount][Xcount] = black;
-							}
-							else
-							{
-								break;
-							}
-
-							Ycount++;
-						}
-					}
-
-					//左上
-					if (Reverseflag8[6] == true)
-					{
-						Ycount = MousePosY - 1;
-
-						for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
-						{
-							if (Ycount <= 0)
-							{
-								break;
-							}
-
-							//白だった場合
-							if (PS[Ycount][Xcount] == white)
-							{
-								PS[Ycount][Xcount] = black;
-							}
-							else
-							{
-								break;
-							}
-
-							Ycount--;
-
-						}
-					}
-
-					//左下
-					if (Reverseflag8[7] == true)
-					{
-						Ycount = MousePosY + 1;
-
-						for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
-						{
-							if (Ycount >= MapSize)
-							{
-								break;
-							}
-
-							//白だった場合
-							if (PS[Ycount][Xcount] == white)
-							{
-								PS[Ycount][Xcount] = black;
-							}
-							else
-							{
-								break;
-							}
-
-							Ycount++;
-						}
-					}
 
 					//白の順番に変更
 					WB = Mode_white;
-					//選択可能処理モードに移動
-					Mode = SelectableProcessing;
+
+					//反転変数を黒に
+					InversionVariable = black;
+
+					//判断変数を白に
+					DecisionVariable = white;
 					break;
+				}
+
+				//選択可能処理モードに移動
+				Mode = SelectableProcessing;
+
+				//→方向
+				if (MousePosX + 1 < MapSize)
+				{
+					for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
+					{
+						//判断変数だった場合
+						if (PS[MousePosY][Xcount] == DecisionVariable)
+						{
+							;
+						}
+						else if (PS[MousePosY][Xcount] == InversionVariable&&Xcount != MousePosX + 1)
+						{
+							for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
+							{
+								//判断変数だった場合
+								if (PS[MousePosY][Xcount] == DecisionVariable)
+								{
+									PS[MousePosY][Xcount] = InversionVariable;
+								}
+								else
+								{
+									break;
+								}
+							}
+							break;
+						}
+						else
+						{
+							break;
+						}
+					}
+				}
+
+				//←方向
+				if (MousePosX > 0)
+				{
+					for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
+					{
+						//判断変数だった場合
+						if (PS[MousePosY][Xcount] == DecisionVariable)
+						{
+							;
+						}
+						else if (PS[MousePosY][Xcount] == InversionVariable&& Xcount != MousePosX - 1)
+						{
+							for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
+							{
+								//判断変数だった場合
+								if (PS[MousePosY][Xcount] == DecisionVariable)
+								{
+									PS[MousePosY][Xcount] = InversionVariable;
+								}
+								else
+								{
+									break;
+								}
+							}
+							break;
+						}
+						else
+						{
+							break;
+						}
+
+					}
+				}
+
+				//↓方向
+				if (MousePosY + 1 < MapSize)
+				{
+					for (Ycount = MousePosY + 1; Ycount < MapSize; Ycount++)
+					{
+						//判断変数だった場合
+						if (PS[Ycount][MousePosX] == DecisionVariable)
+						{
+							;
+						}
+						else if (PS[Ycount][MousePosX] == InversionVariable && Ycount != MousePosY + 1)
+						{
+							for (Ycount = MousePosY + 1; Ycount < MapSize; Ycount++)
+							{
+								//判断変数だった場合
+								if (PS[Ycount][MousePosX] == DecisionVariable)
+								{
+									PS[Ycount][MousePosX] = InversionVariable;
+								}
+								else
+								{
+									break;
+								}
+							}
+							break;
+						}
+						else
+						{
+							break;
+						}
+					}
+				}
+
+				//↑方向
+				if (MousePosY > 0)
+				{
+					for (Ycount = MousePosY - 1; Ycount >= 0; Ycount--)
+					{
+						//判断変数だった場合
+						if (PS[Ycount][MousePosX] == DecisionVariable)
+						{
+							;
+						}
+						else if (PS[Ycount][MousePosX] == InversionVariable&&Ycount != MousePosY - 1)
+						{
+							for (Ycount = MousePosY - 1; Ycount >= 0; Ycount--)
+							{
+								//判断変数だった場合
+								if (PS[Ycount][MousePosX] == DecisionVariable)
+								{
+									PS[Ycount][MousePosX] = InversionVariable;
+								}
+								else
+								{
+									break;
+								}
+							}
+							break;
+						}
+						else
+						{
+							break;
+						}
+					}
+				}
+
+				//右上
+				Ycount = MousePosY - 1;
+
+				if (MousePosX + 1 < MapSize&&Ycount >= 0)
+				{
+					for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
+					{
+						if (Ycount <= 0)
+						{
+							break;
+						}
+
+						//判断変数だった場合
+						if (PS[Ycount][Xcount] == DecisionVariable)
+						{
+							;
+						}
+						else if (PS[Ycount][Xcount] == InversionVariable&&Xcount != MousePosX + 1)
+						{
+							Ycount = MousePosY - 1;
+
+							for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
+							{
+								if (Ycount <= 0)
+								{
+									break;
+								}
+
+								//判断変数だった場合
+								if (PS[Ycount][Xcount] == DecisionVariable)
+								{
+									PS[Ycount][Xcount] = InversionVariable;
+								}
+								else
+								{
+									break;
+								}
+
+								Ycount--;
+							}
+							break;
+						}
+						else
+						{
+							break;
+						}
+
+						Ycount--;
+					}
+				}
+
+				//右下
+				Ycount = MousePosY + 1;
+
+				if (MousePosX + 1 < MapSize&&Ycount < MapSize)
+				{
+					for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
+					{
+						if (Ycount >= MapSize)
+						{
+							break;
+						}
+
+						//判断変数だった場合
+						if (PS[Ycount][Xcount] == DecisionVariable)
+						{
+							;
+						}
+						else if (PS[Ycount][Xcount] == InversionVariable&&Xcount != MousePosX + 1)
+						{
+							Ycount = MousePosY + 1;
+
+							for (Xcount = MousePosX + 1; Xcount < MapSize; Xcount++)
+							{
+								if (Ycount >= MapSize)
+								{
+									break;
+								}
+
+								//判断変数だった場合
+								if (PS[Ycount][Xcount] == DecisionVariable)
+								{
+									PS[Ycount][Xcount] = InversionVariable;
+								}
+								else
+								{
+									break;
+								}
+
+								Ycount++;
+							}
+							break;
+						}
+						else
+						{
+							break;
+						}
+
+						Ycount++;
+					}
+				}
+
+				//左上
+				Ycount = MousePosY - 1;
+
+				if (MousePosX - 1 >= 0 && Ycount >= 0)
+				{
+					for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
+					{
+						if (Ycount <= 0)
+						{
+							break;
+						}
+
+						//判断変数だった場合
+						if (PS[Ycount][Xcount] == DecisionVariable)
+						{
+							;
+						}
+						else if (PS[Ycount][Xcount] == InversionVariable&&Xcount != MousePosX - 1)
+						{
+							Ycount = MousePosY - 1;
+
+							for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
+							{
+								if (Ycount <= 0)
+								{
+									break;
+								}
+
+								//判断変数だった場合
+								if (PS[Ycount][Xcount] == DecisionVariable)
+								{
+									PS[Ycount][Xcount] = InversionVariable;
+								}
+								else
+								{
+									break;
+								}
+
+								Ycount--;
+							}
+							break;
+						}
+						else
+						{
+							break;
+						}
+
+						Ycount--;
+					}
+				}
+
+				//左下
+				Ycount = MousePosY + 1;
+
+				if (MousePosX - 1 >= 0 && Ycount < MapSize)
+				{
+					for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
+					{
+						if (Ycount >= MapSize)
+						{
+							break;
+						}
+
+						//判断変数だった場合
+						if (PS[Ycount][Xcount] == DecisionVariable)
+						{
+							;
+						}
+						else if (PS[Ycount][Xcount] == InversionVariable&&Xcount != MousePosX - 1)
+						{
+							Ycount = MousePosY + 1;
+
+							for (Xcount = MousePosX - 1; Xcount >= 0; Xcount--)
+							{
+								if (Ycount >= MapSize)
+								{
+									break;
+								}
+
+								//判断変数だった場合
+								if (PS[Ycount][Xcount] == DecisionVariable)
+								{
+									PS[Ycount][Xcount] = InversionVariable;
+								}
+								else
+								{
+									break;
+								}
+								
+								Ycount++;
+							}
+							break;
+						}
+						else
+						{
+							break;
+						}
+
+						Ycount++;
+					}
 				}
 
 				break;
 
-				//ゲーム終了モード
+			//ゲーム終了モード
 			case Game_MODE::GameEndProcessing:
+
+				if (Mouseflag == false && pDi->MouseButton(0))
+				{
+					Mouseflag = true;
+
+				}
+				else if (Mouseflag == true && !(pDi->MouseButton(0)))
+				{
+					Mouseflag = false;
+					//反転処理モードに移動
+					Mode = GameStartProcessing;
+				}
 
 				break;
 
@@ -1349,6 +1283,70 @@ int _stdcall WinMain
 						}
 					}
 				}
+
+				//スコアボードの画像を設定
+				sprite_img_ScoreBoard.Draw(img_ScoreBoard);
+
+				if (Mode != GameEndProcessing)
+				{
+					//現在の順番の画像
+					switch (WB)
+					{
+					case Mode_white:
+						sprite_img_cursor.SetPos(470.0, 200.0 + (float)PieceImageSize / 2.0 + 2.0);
+						break;
+					case Mode_black:
+						sprite_img_cursor.SetPos(470.0, 100.0 + (float)PieceImageSize / 2.0 + 2.0);
+						break;
+					}
+					sprite_img_cursor.Draw(img_cursor);
+				}
+				else
+				{
+					if (blackCount > whiteCount)
+					{
+						img_WLD[0].SetNum(0, 0);
+						img_WLD[1].SetNum(1, 0);
+
+					}
+					else if(blackCount < whiteCount)
+					{
+						img_WLD[0].SetNum(1, 0);
+						img_WLD[1].SetNum(0, 0);
+					}
+					else
+					{
+						img_WLD[0].SetNum(2, 0);
+						img_WLD[1].SetNum(2, 0);
+					}
+
+					sprite_img_WLD[0].Draw(img_WLD[0]);
+					sprite_img_WLD[1].Draw(img_WLD[1]);
+				}
+
+				sprite_img_PieceScoreW.Draw(img_PieceScoreW);
+				sprite_img_PieceScoreB.Draw(img_PieceScoreB);
+
+				//駒の数の画像設定
+				//白
+				if (whiteCount >= 10)
+				{
+					img_NumberW[0].SetNum(whiteCount / 10, 0);
+					sprite_img_NumberW[0].Draw(img_NumberW[0]);
+				}
+
+				img_NumberW[1].SetNum(whiteCount % 10, 0);
+				sprite_img_NumberW[1].Draw(img_NumberW[1]);
+
+				//黒
+				if (blackCount >= 10)
+				{
+					img_NumberB[0].SetNum(blackCount / 10, 0);
+					sprite_img_NumberB[0].Draw(img_NumberB[0]);
+				}
+
+				img_NumberB[1].SetNum(blackCount % 10, 0);
+				sprite_img_NumberB[1].Draw(img_NumberB[1]);
 
 				//描画終了の合図
 				d3d.EndScene();

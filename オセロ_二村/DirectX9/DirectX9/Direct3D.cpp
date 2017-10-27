@@ -240,7 +240,7 @@ HRESULT  Direct3D::ClearScreen()
 	{
 		//”wŒi‚ÌƒNƒŠƒAF
 		//‰½‚à•`‰æ‚³‚ê‚Ä‚¢‚È‚¢ó‘Ô‚¾‚Æ‚±‚ÌF‚ªˆê–Ê‚Éo‚é
-		D3DXCOLOR Color = D3DCOLOR_XRGB(255, 255, 255);
+		D3DXCOLOR Color = D3DCOLOR_XRGB(0, 0, 0);
 
 		//Clear‚ÌŽÀsŒ‹‰Ê‚ð•Ô‚·
 		return pDevice3D->Clear(0, NULL,
